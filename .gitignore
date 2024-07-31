@@ -34,3 +34,4 @@
 # Build Artifacts
 build
 .cache
+compile_commands.json

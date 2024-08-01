@@ -31,7 +31,7 @@ struct modifier_state {
 struct pidongle_context {
   libinput *libinput_context;
   udev *udev_context;
-  modifier_state modifier_state;
+  modifier_state mod_state;
 };
 
 

@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <libinput.h>
 #include <iostream>
@@ -50,20 +51,61 @@ pidongle_context pidongle_init() {
   return pidongle_context;
 }
 
-static bool is_modifier_key(uint32_t key) {
+static bool is_modifier_key(uint8_t key) {
   return key == KEY_LEFTCTRL || key == KEY_LEFTSHIFT || key == KEY_LEFTALT ||
          key == KEY_LEFTMETA || key == KEY_RIGHTCTRL || key == KEY_RIGHTSHIFT ||
          key == KEY_RIGHTALT || key == KEY_RIGHTMETA;
 }
 
-static void update_modifier_state(uint32_t key, pidongle_context &context) {}
-static void send_release_report(uint32_t key, pidongle_context &context) {}
-static void send_input_report(uint32_t key, pidongle_context &context) {}
+static void update_modifier_state(uint8_t key, pidongle_context &context) {
+  switch (key) {
+  case KEY_LEFTCTRL:
+    context.mod_state.left_ctrl ^= 1;
+    break;
+  case KEY_LEFTSHIFT:
+    context.mod_state.left_shift ^= 1;
+    break;
+  case KEY_LEFTALT:
+    context.mod_state.left_alt ^= 1;
+    break;
+  case KEY_LEFTMETA:
+    context.mod_state.left_gui ^= 1;
+    break;
+  case KEY_RIGHTMETA:
+    context.mod_state.right_gui ^= 1;
+    break;
+  case KEY_RIGHTCTRL:
+    context.mod_state.right_ctrl ^= 1;
+    break;
+  case KEY_RIGHTSHIFT:
+    context.mod_state.right_shift ^= 1;
+    break;
+  case KEY_RIGHTALT:
+    context.mod_state.right_alt ^= 1;
+    break;
+  default:
+    std::cerr << "Trying to update invalid modifier key";
+  }
+}
+static void send_release_report(pidongle_context &context) {
+  std::uint64_t report = 0; 
+}
+static void send_input_report(uint8_t key, pidongle_context &context) {
+  /* 
+   * 0 byte represents the modifier mask
+   * 1 byte is reserved
+   * 2 - 7 : keys
+   */
+  std::uint64_t report = 0;
+  unsigned char* modifier_mask = (unsigned char*)&context.mod_state;
+  report = ((std::uint64_t)*modifier_mask << 56);
+  report = ((std::uint64_t)key << 46);
+}
 
 static void relayKeyboardEvent(libinput_event_keyboard* keyboard_event, pidongle_context& context)
 {
   libinput_key_state key_state = libinput_event_keyboard_get_key_state(keyboard_event);
-  uint32_t key = libinput_event_keyboard_get_key(keyboard_event);
+  uint8_t key = (uint8_t)libinput_event_keyboard_get_key(keyboard_event);
 
   switch (key_state) {
   case LIBINPUT_KEY_STATE_PRESSED: {
@@ -74,7 +116,7 @@ static void relayKeyboardEvent(libinput_event_keyboard* keyboard_event, pidongle
       break;
   }
   case LIBINPUT_KEY_STATE_RELEASED: {
-    send_release_report(key, context);
+    send_release_report(context);
     break;
   }
   }
@@ -99,7 +141,7 @@ void pidongle_relay_events(pidongle_context& pidongle_context) {
     /* Only look for keyboard events */
     if (libinput_event_get_type(event) == LIBINPUT_EVENT_KEYBOARD_KEY) {
       libinput_event_keyboard* keyboard_event = libinput_event_get_keyboard_event(event);
-      relayKeyboardEvent(keyboard_event);
+      relayKeyboardEvent(keyboard_event, pidongle_context);
     }
 
     libinput_event_destroy(event);

@@ -10,29 +10,25 @@
 #include <pi_dongle.hpp>
 #include <linux/input-event-codes.h>
 
-static void check_condition(bool condition, const std::string& faliure_message) {
+static void check_condition(bool condition,
+                            const std::string &faliure_message) {
   if (!condition) {
     std::cerr << "condition faliure : " << faliure_message << '\n';
     std::exit(EXIT_FAILURE);
   }
 }
 
-static int open_restricted(const char* path, int flags, void* user_data)
-{
+static int open_restricted(const char *path, int flags, void *user_data) {
   int fd = open(path, flags);
   return fd < 0 ? -errno : fd;
 }
 
-static void close_restricted(int fd, void* user_data)
-{
-  close(fd);
-}
+static void close_restricted(int fd, void *user_data) { close(fd); }
 
 const static struct libinput_interface interface = {
-  .open_restricted = open_restricted,
-  .close_restricted = close_restricted,
+    .open_restricted = open_restricted,
+    .close_restricted = close_restricted,
 };
-
 
 pidongle_context pidongle_init() {
   pidongle_context pidongle_context;
@@ -47,6 +43,12 @@ pidongle_context pidongle_init() {
 
   pidongle_context.udev_context = udev_context;
   pidongle_context.libinput_context = libinput_context;
+
+  pidongle_context.device_file.open("/dev/hidg0",
+                                    std::ios::out | std::ios::binary);
+
+  check_condition(pidongle_context.device_file.is_open(),
+                  "Failed to open device file");
 
   return pidongle_context;
 }
@@ -88,22 +90,18 @@ static void update_modifier_state(uint8_t key, pidongle_context &context) {
   }
 }
 static void send_release_report(pidongle_context &context) {
-  std::uint64_t report = 0; 
+  report release_report = {0};
+  context.device_file.write((char *)&release_report, sizeof(report));
 }
 static void send_input_report(uint8_t key, pidongle_context &context) {
-  /* 
-   * 0 byte represents the modifier mask
-   * 1 byte is reserved
-   * 2 - 7 : keys
-   */
-  std::uint64_t report = 0;
-  unsigned char* modifier_mask = (unsigned char*)&context.mod_state;
-  report = ((std::uint64_t)*modifier_mask << 56);
-  report = ((std::uint64_t)key << 46);
+  report input_report = {0};
+  input_report.modifiers = context.mod_state;
+  input_report.key1 = key;
+  context.device_file.write((char *)&input_report, sizeof(report));
 }
 
-static void relayKeyboardEvent(libinput_event_keyboard* keyboard_event, pidongle_context& context)
-{
+static void relayKeyboardEvent(libinput_event_keyboard *keyboard_event,
+                               pidongle_context &context) {
   libinput_key_state key_state = libinput_event_keyboard_get_key_state(keyboard_event);
   uint8_t key = (uint8_t)libinput_event_keyboard_get_key(keyboard_event);
 

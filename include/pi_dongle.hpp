@@ -2,19 +2,10 @@
 #define __PI_DONGLE__
 
 
+#include <cstdint>
 #include <libinput.h>
 #include <libudev.h>
-
-struct report {
-  unsigned char modifiers;
-  unsigned char reserved;
-  unsigned char key1;
-  unsigned char key2;
-  unsigned char key3;
-  unsigned char key4;
-  unsigned char key5;
-  unsigned char key6;
-};
+#include <fstream>
 
 
 struct modifier_state {
@@ -26,12 +17,25 @@ struct modifier_state {
   unsigned right_shift: 1;
   unsigned right_alt  : 1;
   unsigned right_gui  : 1;
-};
+}__attribute__((packed));
+
+struct report {
+  modifier_state modifiers;
+  std::uint8_t reserved;
+  std::uint8_t key1;
+  std::uint8_t key2;
+  std::uint8_t key3;
+  std::uint8_t key4;
+  std::uint8_t key5;
+  std::uint8_t key6;
+} __attribute__((packed));
+
 
 struct pidongle_context {
   libinput *libinput_context;
   udev *udev_context;
-  modifier_state mod_state;
+  modifier_state mod_state = {0};
+  std::ofstream device_file;
 };
 
 

@@ -20,14 +20,14 @@ struct modifier_state {
 }__attribute__((packed));
 
 struct report {
-  std::uint8_t key6;
-  std::uint8_t key5;
-  std::uint8_t key4;
-  std::uint8_t key3;
-  std::uint8_t key2;
-  std::uint8_t key1;
-  std::uint8_t reserved;
   modifier_state modifiers;
+  std::uint8_t reserved;
+  std::uint8_t key1;
+  std::uint8_t key2;
+  std::uint8_t key3;
+  std::uint8_t key4;
+  std::uint8_t key5;
+  std::uint8_t key6;
 } __attribute__((packed));
 
 
@@ -35,7 +35,7 @@ struct pidongle_context {
   libinput *libinput_context;
   udev *udev_context;
   modifier_state mod_state = {0};
-  std::ofstream device_file;
+  int dev_fd;
 };
 
 

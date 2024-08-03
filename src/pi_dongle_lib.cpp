@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <pi_dongle.hpp>
 #include <linux/input-event-codes.h>
+#include <input-event-usb-hid.h>
 
 static void check_condition(bool condition,
                             const std::string &faliure_message) {
@@ -43,13 +44,8 @@ pidongle_context pidongle_init() {
 
   pidongle_context.udev_context = udev_context;
   pidongle_context.libinput_context = libinput_context;
-
-  pidongle_context.device_file.open("/dev/hidg0",
-                                    std::ios::out | std::ios::binary);
-
-  check_condition(pidongle_context.device_file.is_open(),
-                  "Failed to open device file");
-
+  pidongle_context.dev_fd = open("/dev/hidg0", O_WRONLY);
+  check_condition(pidongle_context.dev_fd >= 0, "Failed to open device file");
   return pidongle_context;
 }
 
@@ -91,13 +87,18 @@ static void update_modifier_state(uint8_t key, pidongle_context &context) {
 }
 static void send_release_report(pidongle_context &context) {
   report release_report = {0};
-  context.device_file.write((char *)&release_report, sizeof(report));
+  ssize_t written = write(context.dev_fd, (char*)&release_report, sizeof(report));
+  check_condition(written >= 0, "Write failed!!");
 }
 static void send_input_report(uint8_t key, pidongle_context &context) {
   report input_report = {0};
   input_report.modifiers = context.mod_state;
-  input_report.key1 = key;
-  context.device_file.write((char *)&input_report, sizeof(report));
+  if (input_event_usb_hid_map.contains(key)) {
+    input_report.key1 = input_event_usb_hid_map.at(key);
+    ssize_t written =
+        write(context.dev_fd, (char *)&input_report, sizeof(input_report));
+    check_condition(written >= 0, "Write failed !!");
+  }
 }
 
 static void relayKeyboardEvent(libinput_event_keyboard *keyboard_event,
@@ -107,13 +108,16 @@ static void relayKeyboardEvent(libinput_event_keyboard *keyboard_event,
 
   switch (key_state) {
   case LIBINPUT_KEY_STATE_PRESSED: {
-      if (is_modifier_key(key)) {
-        update_modifier_state(key, context);
-      }
-      send_input_report(key, context);
-      break;
+    if (is_modifier_key(key)) {
+      update_modifier_state(key, context);
+    }
+    send_input_report(key, context);
+    break;
   }
   case LIBINPUT_KEY_STATE_RELEASED: {
+    if (is_modifier_key(key)) {
+      update_modifier_state(key, context);
+    }
     send_release_report(context);
     break;
   }
